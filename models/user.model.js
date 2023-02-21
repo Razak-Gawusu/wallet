@@ -72,6 +72,7 @@ const userSchema = new mongoose.Schema(
       default: false,
       select: false,
     },
+    passwordChangedAt: Date,
   },
   {
     toJSON: { virtuals: true },
@@ -80,7 +81,9 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.methods.generateAuthToken = function () {
-  return jwt.sign({ _id: this._id }, config.get("jwtPrivateKey"));
+  return jwt.sign({ _id: this._id }, config.get("jwtPrivateKey"), {
+    expiresIn: config.get("jwtExpiresIn"),
+  });
 };
 
 userSchema.methods.isValidPassword = async function (
@@ -88,6 +91,11 @@ userSchema.methods.isValidPassword = async function (
   hashPassword
 ) {
   return bcrypt.compare(inputPassword, hashPassword);
+};
+
+userSchema.methods.isExpiredToken = async function (tokenIat) {
+  const changePwdTime = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
+  return changePwdTime > tokenIat;
 };
 
 userSchema.virtual("fullName").get(function () {
@@ -118,6 +126,7 @@ function validateSignup(data) {
     phone: Joi.string().min(13).max(13).required(),
     password: Joi.string().min(8).max(255).required(),
     confirmPassword: Joi.string().min(8).max(255).required(),
+    passwordChangedAt: Joi.date(),
   });
   return schema.validate(data);
 }

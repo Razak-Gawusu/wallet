@@ -15,6 +15,7 @@ const signup = async (req, res) => {
     phone: req.body.phone,
     password: req.body.password,
     confirmPassword: req.body.confirmPassword,
+    passwordChangedAt: req.body.passwordChangedAt,
   });
 
   await user.save();
@@ -49,4 +50,14 @@ const login = async (req, res) => {
   });
 };
 
-module.exports = { signup, login };
+const restrictTo = (...roles) => {
+  return async (req, res, next) => {
+    if (!roles.includes(req.user.role))
+      return next(
+        new AppError(`You don't have permission to perform this action`, 403)
+      );
+    next();
+  };
+};
+
+module.exports = { signup, login, restrictTo };
