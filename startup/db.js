@@ -2,8 +2,14 @@ const mongoose = require("mongoose");
 const config = require("config");
 const debuglog = require("./logging");
 
-module.exports = function () {
+module.exports = async function (next) {
   const db = config.get("mongodb_uri");
   mongoose.set("strictQuery", false);
-  mongoose.connect(db).then(() => debuglog(`successfully connect to ${db}`));
+
+  try {
+    const connect = await mongoose.connect(db);
+    if (connect) debuglog(`successfully connect to ${db}`);
+  } catch (err) {
+    debuglog(err.message);
+  }
 };
