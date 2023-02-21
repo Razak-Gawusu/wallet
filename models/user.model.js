@@ -1,7 +1,9 @@
 const mongoose = require("mongoose");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
+const { logError } = require("../startup/logging");
 const config = require("config");
+const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema(
   {
@@ -53,7 +55,7 @@ const userSchema = new mongoose.Schema(
         validator: function (el) {
           return el === this.password;
         },
-        message: "Password are not the same",
+        message: "Passwords are not the same",
       },
     },
     role: {
@@ -71,16 +73,6 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
   },
-  // {
-  //   virtuals: {
-  //     fullName: {
-  //       get() {
-  //         return this.name.first + " " + this.name.last;
-  //       },
-  //     },
-  //   },
-  // }
-
   {
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
@@ -88,17 +80,37 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.methods.generateAuthToken = function () {
-  const token = jwt.sign({ _id: this._id }, config.get("jwtPrivateKey"));
-  return token;
+  return jwt.sign({ _id: this._id }, config.get("jwtPrivateKey"));
+};
+
+userSchema.methods.isValidPassword = async function (
+  inputPassword,
+  hashPassword
+) {
+  return bcrypt.compare(inputPassword, hashPassword);
 };
 
 userSchema.virtual("fullName").get(function () {
   return this.name.first + " " + this.name.last;
 });
 
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  const salt = await bcrypt.genSalt(12);
+  this.password = await bcrypt.hash(this.password, salt);
+  this.confirmPassword = undefined;
+
+  next();
+});
+
+// userSchema.pre(/^find/, function (next) {
+//   this.find({}).select("-password");
+//   next();
+// });
+
 const User = mongoose.model("User", userSchema);
 
-function validateUser(data) {
+function validateSignup(data) {
   const schema = Joi.object({
     first: Joi.string().min(2).max(50).required(),
     last: Joi.string().min(2).max(50).required(),
@@ -110,7 +122,16 @@ function validateUser(data) {
   return schema.validate(data);
 }
 
+function validateLogin(data) {
+  const schema = Joi.object({
+    email: Joi.string().min(5).max(50).required().email(),
+    password: Joi.string().min(8).max(255).required(),
+  });
+  return schema.validate(data);
+}
+
 module.exports = {
   User,
-  validateUser,
+  validateSignup,
+  validateLogin,
 };

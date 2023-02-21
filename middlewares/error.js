@@ -16,7 +16,6 @@ function handleCastErrorDB(err) {
 }
 
 function sendErrorDev(res, err) {
-  debuglog(err.isOperational);
   res.status(err.statusCode).json({
     status: err.status,
     message: err.message,
@@ -57,4 +56,6 @@ module.exports = function (err, req, res, next) {
     }
     sendErrorProd(res, error);
   }
+
+  next();
 };
