@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
-const { logError } = require("../startup/logging");
 const config = require("config");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema(
   {
@@ -73,6 +73,8 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     passwordChangedAt: Date,
+    passwordResetToken: String,
+    passwordResetExpires: Date,
   },
   {
     toJSON: { virtuals: true },
@@ -98,6 +100,17 @@ userSchema.methods.isExpiredToken = async function (tokenIat) {
   return changePwdTime > tokenIat;
 };
 
+userSchema.methods.generateResetToken = async function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+  return resetToken;
+};
+
 userSchema.virtual("fullName").get(function () {
   return this.name.first + " " + this.name.last;
 });
@@ -108,6 +121,12 @@ userSchema.pre("save", async function (next) {
   this.password = await bcrypt.hash(this.password, salt);
   this.confirmPassword = undefined;
 
+  next();
+});
+
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password") && this.isNew) return next();
+  this.passwordChangedAt = Date.now() - 1000;
   next();
 });
 
@@ -139,8 +158,38 @@ function validateLogin(data) {
   return schema.validate(data);
 }
 
+function validateForgetPassword(data) {
+  const schema = Joi.object({
+    email: Joi.string().min(5).max(50).required().email(),
+  });
+
+  return schema.validate(data);
+}
+
+function validateResetPassword(data) {
+  const schema = Joi.object({
+    password: Joi.string().min(8).max(255).required(),
+    confirmPassword: Joi.string().min(8).max(255).required(),
+  });
+
+  return schema.validate(data);
+}
+
+function validateUpdatePassword(data) {
+  const schema = Joi.object({
+    currentPassword: Joi.string().min(8).max(255).required(),
+    password: Joi.string().min(8).max(255).required(),
+    confirmPassword: Joi.string().min(8).max(255).required(),
+  });
+
+  return schema.validate(data);
+}
+
 module.exports = {
   User,
   validateSignup,
   validateLogin,
+  validateForgetPassword,
+  validateResetPassword,
+  validateUpdatePassword,
 };

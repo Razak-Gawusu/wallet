@@ -1,6 +1,15 @@
 const _ = require("lodash");
-const { User, validateSignup, validateLogin } = require("../models/user.model");
+const crypto = require("crypto");
+const {
+  User,
+  validateSignup,
+  validateLogin,
+  validateForgetPassword,
+  validateResetPassword,
+  validateUpdatePassword,
+} = require("../models/user.model");
 const AppError = require("../util/error.util");
+const sendEmail = require("../util/email.util");
 
 const signup = async (req, res) => {
   const { error } = validateSignup(req.body);
@@ -37,14 +46,106 @@ const login = async (req, res) => {
   const user = await User.findOne({ email: req.body.email }).select(
     "+password"
   );
+  if (!user) throw new AppError("Invalid email or password", 400);
 
   const isValid = await user.isValidPassword(req.body.password, user.password);
-
-  if (!user || !isValid) throw new AppError("Invalid email or password", 400);
+  if (!isValid) throw new AppError("Invalid email or password", 400);
 
   const token = user.generateAuthToken();
 
   res.status(201).json({
+    status: "success",
+    token,
+  });
+};
+
+const forgotPassword = async (req, res) => {
+  const { error } = validateForgetPassword(req.body);
+  if (error) throw new AppError(error.details[0].message, 400);
+
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) throw new AppError("Email does not exist", 404);
+
+  const resetToken = await user.generateResetToken();
+  await user.save({ validateBeforeSave: false });
+
+  const resetUrl = `${req.protocol}://${req.get(
+    "host"
+  )}/wallet/api/v1/users/resetPassword/${resetToken}`;
+
+  const message = `Forgot your password send a patch request with your new password to ${resetUrl} \n If you didn't forget password please ignore this.`;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Reset Password",
+      message,
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Reset token sent to email",
+    });
+  } catch (err) {
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    throw new AppError(err.message, 500);
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { error } = validateResetPassword(req.body);
+  if (error) throw new AppError(error.details[0].message, 400);
+
+  const hashResetToken = crypto
+    .createHash("sha256")
+    .update(req.params.token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashResetToken,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+
+  if (!user)
+    throw new AppError(
+      "Invalid reset token or reset token has expired, please try again"
+    );
+
+  user.password = req.body.password;
+  user.confirmPassword = req.body.confirmPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+
+  await user.save();
+
+  const token = user.generateAuthToken();
+  res.status(200).json({
+    status: "success",
+    token,
+  });
+};
+
+const updatePassword = async (req, res) => {
+  const { error } = validateUpdatePassword(req.body);
+  if (error) throw new AppError(error.details[0].message, 400);
+
+  const user = await User.findById(req.user._id).select("+password");
+  const isValid = await user.isValidPassword(
+    req.body.currentPassword,
+    user.password
+  );
+  if (!isValid) throw new AppError("Invalid password", 401);
+
+  user.password = req.body.password;
+  user.confirmPassword = req.body.confirmPassword;
+
+  await user.save();
+
+  const token = user.generateAuthToken();
+  res.status(200).json({
     status: "success",
     token,
   });
@@ -60,4 +161,11 @@ const restrictTo = (...roles) => {
   };
 };
 
-module.exports = { signup, login, restrictTo };
+module.exports = {
+  signup,
+  login,
+  forgotPassword,
+  resetPassword,
+  updatePassword,
+  restrictTo,
+};
