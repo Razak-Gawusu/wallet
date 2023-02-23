@@ -106,6 +106,7 @@ userSchema.methods.isValidPassword = async function (
 };
 
 userSchema.methods.isExpiredToken = async function (tokenIat) {
+  if (!this.passwordChangedAt) return false;
   const changePwdTime = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
   return changePwdTime > tokenIat;
 };
@@ -135,7 +136,7 @@ userSchema.pre("save", async function (next) {
 });
 
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password") && this.isNew) return next();
+  if (!this.isModified("password") || this.isNew) return next();
   this.passwordChangedAt = Date.now() - 1000;
   next();
 });

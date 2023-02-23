@@ -7,6 +7,7 @@ const {
   forgotPassword,
   resetPassword,
   updatePassword,
+  resendOTP,
 } = require("../controller/auth.controller");
 const { getAllUsers } = require("../controller/user.controller");
 const auth = require("../middlewares/protect.middleware");
@@ -14,7 +15,8 @@ const auth = require("../middlewares/protect.middleware");
 const router = express.Router();
 
 router.route("/signup").post(signup);
-router.route("verifyOpt/:id").post(verifyOTP);
+router.route("/verifyOtp").patch(auth, verifyOTP);
+router.route("/resendOtp").patch(auth, resendOTP);
 router.route("/login").post(login);
 router.route("/updateMyPassword").patch(auth, updatePassword);
 router.route("/forgotPassword").post(forgotPassword);

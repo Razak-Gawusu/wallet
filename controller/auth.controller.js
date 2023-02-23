@@ -9,7 +9,7 @@ const {
   validateUpdatePassword,
 } = require("../models/user.model");
 
-const { Otp } = require("../models/otp.model");
+const { Otp, validateOtp } = require("../models/otp.model");
 const AppError = require("../util/error.util");
 const sendEmail = require("../util/email.util");
 
@@ -30,18 +30,49 @@ const signup = async (req, res) => {
   });
 
   const pin = user.generateOtp();
-
   const otp = new Otp({
     user: user._id,
     pin,
   });
-
   if (!otp) throw new AppError("error otp", 400);
-
   await user.save();
   await otp.save();
 
-  const message = `Your verification code is ${otp.pin}`;
+  const message = `Your verification code is ${pin}`;
+
+  try {
+    await sendEmail({ email: user.email, subject: "Verify Account", message });
+
+    const token = user.generateAuthToken();
+    res.status(201).json({
+      status: "success",
+      token,
+      data: {
+        user: _.pick(user, ["_id", "fullName", "email", "phone", "role"]),
+      },
+    });
+  } catch (error) {
+    await User.findByIdAndRemove(user._id);
+    throw new AppError("Try again, something bad happen during signup", 500);
+  }
+};
+
+const resendOTP = async (req, res) => {
+  const _id = req.user._id;
+  console.log(_id);
+
+  const user = await User.findById(_id);
+
+  console.log(user.fullName);
+  const otp = await Otp.findOne({ user: _id });
+
+  console.log(otp);
+  const pin = user.generateOtp();
+
+  otp.pin = pin;
+  otp.save();
+
+  const message = `Your verification code is ${pin}`;
 
   try {
     await sendEmail({ email: user.email, subject: "Verify Account", message });
@@ -63,20 +94,27 @@ const signup = async (req, res) => {
 const verifyOTP = async (req, res) => {
   const _id = req.user._id;
 
-  const otp = await Otp.findOne({ _id, pin });
+  const { error } = validateOtp(req.body);
+  if (error) throw new AppError(error.details[0].message, 400);
+
+  hashPin = crypto.createHash("sha256").update(req.body.pin).digest("hex");
+
+  const otp = await Otp.findOne({ user: _id, pin: hashPin });
+  console.log(otp);
   if (!otp) throw new AppError("Invalid otp, try again", 401);
 
-  isValid = await otp.isExpires();
-  if (!isValid) throw new AppError("Otp has expired, try again");
+  isExpired = await otp.isExpired();
+  if (isExpired) throw new AppError("Otp has expired, try again");
 
   const user = await User.findById(otp.user);
   user.active = true;
   user.save({ validateBeforeSave: false });
 
-  const token = user.generateAuthToken();
+  await Otp.findByIdAndRemove(otp._id);
+
   res.status(200).json({
     status: "success",
-    token,
+    message: "successfully verified account",
   });
 };
 
@@ -210,4 +248,5 @@ module.exports = {
   resetPassword,
   updatePassword,
   restrictTo,
+  resendOTP,
 };

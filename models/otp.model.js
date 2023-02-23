@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 const Joi = require("joi");
+const crypto = require("crypto");
+
 const otpSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -12,14 +14,16 @@ const otpSchema = new mongoose.Schema({
     required: true,
   },
 
-  optExpires: Date,
+  optExpiresAt: Date,
 });
 
-otpSchema.methods.isExpired = async function () {
-  return this.optExpires > Date.now();
+otpSchema.methods.isExpired = function () {
+  return Date.now() > this.optExpiresAt;
 };
+
 otpSchema.pre("save", function (next) {
-  this.optExpires = Date.now() + 1000 * 60;
+  this.pin = crypto.createHash("sha256").update(this.pin).digest("hex");
+  this.optExpiresAt = Date.now() + 1000 * 60;
   next();
 });
 
@@ -27,8 +31,7 @@ const Otp = mongoose.model("Otp", otpSchema);
 
 const validateOtp = (data) => {
   const schema = Joi.object({
-    userId: Joi.objectId().required(),
-    pin: Joi.string(),
+    pin: Joi.string().min(4).max(4),
   });
   return schema.validate(data);
 };
