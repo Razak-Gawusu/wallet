@@ -3,18 +3,15 @@ const config = require("config");
 
 const sendEmail = async (options) => {
   const transport = nodemailer.createTransport({
-    service: "gmail",
+    host: config.get("host"),
+    port: config.get("port"),
     auth: {
-      user: config.get("emailAddress"),
-      pass: config.get("emailPassword"),
+      user: config.get("username"),
+      pass: config.get("password"),
     },
   });
   const mailOptions = {
-<<<<<<< Updated upstream
-    from: config.get("emailAddress"),
-=======
-    from: config.get("wallet@mail.io"),
->>>>>>> Stashed changes
+    from: config.get("address"),
     to: options.email,
     subject: options.subject,
     text: options.message,
