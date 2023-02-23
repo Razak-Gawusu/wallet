@@ -12,8 +12,6 @@ module.exports = function (app) {
   app.use("/wallet/api/v1/accounts", accounts);
 
   app.all("*", (req, res, next) => {
-    console.log(req.protocol);
-    console.log(req.get("host"));
     const err = new AppError(
       `Can't find ${req.originalUrl} on this server`,
       404

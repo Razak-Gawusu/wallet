@@ -58,15 +58,8 @@ const signup = async (req, res) => {
 };
 
 const resendOTP = async (req, res) => {
-  const _id = req.user._id;
-  console.log(_id);
-
-  const user = await User.findById(_id);
-
-  console.log(user.fullName);
-  const otp = await Otp.findOne({ user: _id });
-
-  console.log(otp);
+  const user = await User.findById(req.user._id);
+  const otp = await Otp.findOne({ user: req.user._id });
   const pin = user.generateOtp();
 
   otp.pin = pin;
@@ -100,7 +93,6 @@ const verifyOTP = async (req, res) => {
   hashPin = crypto.createHash("sha256").update(req.body.pin).digest("hex");
 
   const otp = await Otp.findOne({ user: _id, pin: hashPin });
-  console.log(otp);
   if (!otp) throw new AppError("Invalid otp, try again", 401);
 
   isExpired = await otp.isExpired();
