@@ -90,7 +90,10 @@ const verifyOTP = async (req, res) => {
   const { error } = validateOtp(req.body);
   if (error) throw new AppError(error.details[0].message, 400);
 
-  hashPin = crypto.createHash("sha256").update(req.body.pin).digest("hex");
+  crypto.hashPin = crypto
+    .createHash("sha256")
+    .update(req.body.pin)
+    .digest("hex");
 
   const otp = await Otp.findOne({ user: _id, pin: hashPin });
   if (!otp) throw new AppError("Invalid otp, try again", 401);
