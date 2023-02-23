@@ -82,6 +82,16 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+userSchema.methods.generateOtp = function () {
+  let arr = [];
+
+  for (let i = 0; i < 4; i++) {
+    arr.push(Math.floor(Math.random() * 10));
+  }
+
+  return arr.join("");
+};
+
 userSchema.methods.generateAuthToken = function () {
   return jwt.sign({ _id: this._id }, config.get("jwtPrivateKey"), {
     expiresIn: config.get("jwtExpiresIn"),

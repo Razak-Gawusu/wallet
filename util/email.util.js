@@ -10,7 +10,11 @@ const sendEmail = async (options) => {
     },
   });
   const mailOptions = {
+<<<<<<< Updated upstream
     from: config.get("emailAddress"),
+=======
+    from: config.get("wallet@mail.io"),
+>>>>>>> Stashed changes
     to: options.email,
     subject: options.subject,
     text: options.message,

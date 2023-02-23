@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   signup,
+  verifyOTP,
   login,
   restrictTo,
   forgotPassword,
@@ -13,6 +14,7 @@ const auth = require("../middlewares/protect.middleware");
 const router = express.Router();
 
 router.route("/signup").post(signup);
+router.route("verifyOpt/:id").post(verifyOTP);
 router.route("/login").post(login);
 router.route("/updateMyPassword").patch(auth, updatePassword);
 router.route("/forgotPassword").post(forgotPassword);
