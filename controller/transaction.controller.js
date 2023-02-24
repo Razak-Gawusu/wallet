@@ -86,6 +86,12 @@ const transferFund = async (req, res) => {
     transaction.status = true;
     account.balance = account.balance - amount;
     depositAccount.balance = depositAccount.balance + amount;
+  } else {
+    await transaction.save();
+    return res.status(400).json({
+      status: "fail",
+      message: "Unable to send funds, insufficient funds",
+    });
   }
 
   await transaction.save();
