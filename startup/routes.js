@@ -3,6 +3,7 @@ const error = require("../middlewares/error");
 const AppError = require("../util/error.util");
 const users = require("../routes/users.route");
 const accounts = require("../routes/accouts.route");
+const transactions = require("../routes/transactions.route");
 
 module.exports = function (app) {
   app.use(express.json());
@@ -10,6 +11,7 @@ module.exports = function (app) {
 
   app.use("/wallet/api/v1/users", users);
   app.use("/wallet/api/v1/accounts", accounts);
+  app.use("/wallet/api/v1/transactions", transactions);
 
   app.all("*", (req, res, next) => {
     const err = new AppError(

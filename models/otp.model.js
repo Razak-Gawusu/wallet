@@ -21,6 +21,14 @@ otpSchema.methods.isExpired = function () {
   return Date.now() > this.optExpiresAt;
 };
 
+otpSchema.methods.generateOtp = function () {
+  let arr = [];
+  for (let i = 0; i < 4; i++) {
+    arr.push(Math.floor(Math.random() * 10));
+  }
+  return arr.join("");
+};
+
 otpSchema.pre("save", function (next) {
   this.pin = crypto.createHash("sha256").update(this.pin).digest("hex");
   this.optExpiresAt = Date.now() + 1000 * 60;

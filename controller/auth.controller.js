@@ -8,6 +8,7 @@ const {
   validateResetPassword,
   validateUpdatePassword,
 } = require("../models/user.model");
+const { Account } = require("../models/account.model");
 
 const { Otp, validateOtp } = require("../models/otp.model");
 const AppError = require("../util/error.util");
@@ -29,17 +30,18 @@ const signup = async (req, res) => {
     passwordChangedAt: req.body.passwordChangedAt,
   });
 
-  const pin = user.generateOtp();
   const otp = new Otp({
     user: user._id,
-    pin,
   });
-  if (!otp) throw new AppError("error otp", 400);
+  const pin = otp.generateOtp();
+  otp.pin = pin;
+
   await user.save();
   await otp.save();
 
-  const message = `Your verification code is ${pin}`;
+  if (!otp) throw new AppError("error otp", 400);
 
+  const message = `Your verification code is ${pin}`;
   try {
     await sendEmail({ email: user.email, subject: "Verify Account", message });
 
@@ -47,9 +49,6 @@ const signup = async (req, res) => {
     res.status(201).json({
       status: "success",
       token,
-      data: {
-        user: _.pick(user, ["_id", "fullName", "email", "phone", "role"]),
-      },
     });
   } catch (error) {
     await User.findByIdAndRemove(user._id);
@@ -60,7 +59,9 @@ const signup = async (req, res) => {
 const resendOTP = async (req, res) => {
   const user = await User.findById(req.user._id);
   const otp = await Otp.findOne({ user: req.user._id });
-  const pin = user.generateOtp();
+
+  console.log(otp);
+  const pin = otp.generateOtp();
 
   otp.pin = pin;
   otp.save();
@@ -90,7 +91,7 @@ const verifyOTP = async (req, res) => {
   const { error } = validateOtp(req.body);
   if (error) throw new AppError(error.details[0].message, 400);
 
-  crypto.hashPin = crypto
+  const hashPin = crypto
     .createHash("sha256")
     .update(req.body.pin)
     .digest("hex");
@@ -102,15 +103,36 @@ const verifyOTP = async (req, res) => {
   if (isExpired) throw new AppError("Otp has expired, try again");
 
   const user = await User.findById(otp.user);
-  user.active = true;
+  user.isVerified = true;
   user.save({ validateBeforeSave: false });
 
   await Otp.findByIdAndRemove(otp._id);
 
-  res.status(200).json({
-    status: "success",
-    message: "successfully verified account",
+  const account = new Account({
+    user: user._id,
   });
+  account.number = account.generateAccountNumber();
+  await account.save();
+
+  const message = `Your wallet account number is: ${account.number}`;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Successfully verified account",
+      message,
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "successfully verified account",
+    });
+  } catch (err) {
+    user.isVerified = false;
+    user.save({ validateBeforeSave: false });
+
+    throw new AppError(err.message, 500);
+  }
 };
 
 const login = async (req, res) => {

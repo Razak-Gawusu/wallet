@@ -66,7 +66,7 @@ const userSchema = new mongoose.Schema(
     photo: {
       type: String,
     },
-    active: {
+    isVerified: {
       type: Boolean,
       required: true,
       default: false,
@@ -81,16 +81,6 @@ const userSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
-
-userSchema.methods.generateOtp = function () {
-  let arr = [];
-
-  for (let i = 0; i < 4; i++) {
-    arr.push(Math.floor(Math.random() * 10));
-  }
-
-  return arr.join("");
-};
 
 userSchema.methods.generateAuthToken = function () {
   return jwt.sign({ _id: this._id }, config.get("jwtPrivateKey"), {

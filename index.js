@@ -1,6 +1,5 @@
 require("dotenv").config();
 require("express-async-errors");
-const config = require("config");
 const express = require("express");
 const debuglog = require("./startup/logging");
 const app = express();

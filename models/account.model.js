@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Joi = require("joi");
+const bcrypt = require("bcrypt");
 const debuglog = require("../startup/logging");
 
 const accountSchema = new mongoose.Schema(
@@ -16,14 +17,19 @@ const accountSchema = new mongoose.Schema(
       unique: true,
       min: 15,
     },
-    amount: {
+    balance: {
       type: Number,
       required: true,
       default: 0,
     },
-    active: {
+    pin: {
+      type: String,
+    },
+    isActive: {
       type: Boolean,
-      required: true,
+      required: function () {
+        return this.pin !== undefined;
+      },
       default: false,
     },
   },
@@ -35,44 +41,40 @@ const accountSchema = new mongoose.Schema(
 
 accountSchema.methods.generateAccountNumber = function () {
   let arr = [1, 0, 0, 1, 0];
-
   for (let i = 0; i < 10; i++) {
     arr.push(Math.floor(Math.random() * 10));
   }
-
   return Number(arr.join(""));
 };
 
+accountSchema.methods.hashAccountPin = async function (pin) {
+  const salt = await bcrypt.genSalt(12);
+  return bcrypt.hash(pin, salt);
+};
+
+accountSchema.methods.isValidPin = async function (pin, hashedPin) {
+  return bcrypt.compare(pin, hashedPin);
+};
+
+accountSchema.methods.getCurrencyAmount = function (currency, amount) {
+  if (currency === "naira") return amount;
+
+  return amount * 12;
+};
 accountSchema.virtual("dollarAmount").get(function () {
   return this.amount / 12;
 });
 
-// accountSchema.pre("save", async function (next) {
-//   const salt = await genSalt(10);
-//   debuglog(this.number);
-//   this.number = await hash(this.number, salt);
-
-//   next();
-// });
-
-// accountSchema.pre(/^find/, function (next) {
-//   this.find({}).select("-number");
-//   next();
-// });
-
 const Account = mongoose.model("Account", accountSchema);
 
-function validateAccount(data) {
+function validateCreateTransactionPin(data) {
   const schema = Joi.object({
-    userId: Joi.objectId().required(),
-    number: Joi.number().min(15).max(15),
-    amount: Joi.number().min(0),
-    active: Joi.boolean(),
+    pin: Joi.string().required(),
   });
   return schema.validate(data);
 }
 
 module.exports = {
   Account,
-  validateAccount,
+  validateCreateTransactionPin,
 };
