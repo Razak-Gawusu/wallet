@@ -1,11 +1,35 @@
 const { Account } = require("../models/account.model");
 const _ = require("lodash");
-
+const APIFeatures = require("../util/apiFeatures.util");
 const {
   Transaction,
   validateTransaction,
 } = require("../models/transaction.model");
 const AppError = require("../util/error.util");
+
+const getAllTransactions = async (req, res) => {
+  const features = new APIFeatures(Transaction.find(), req.query)
+    .filter()
+    .sort()
+    .limitfields()
+    .paginate();
+
+  const transactions = await features.query;
+  const countTransactionsQuery = new APIFeatures(Transaction.find(), req.query)
+    .filter()
+    .sort();
+
+  const countTransactions = await countTransactionsQuery.query;
+
+  res.status(200).json({
+    status: "success",
+    hasNext: features.hasNext(countTransactions.length),
+    total: transactions.length,
+    data: {
+      transactions,
+    },
+  });
+};
 
 const fundAccount = async (req, res) => {
   const account = await Account.findOne({ user: req.user._id, isActive: true });
@@ -23,15 +47,10 @@ const fundAccount = async (req, res) => {
     to: account._id,
     amount: parseInt(req.body.amount),
     currency: req.body.currency,
+    status: true,
   });
 
-  try {
-    await transaction.save();
-  } catch (err) {
-    transaction.status = false;
-    await transaction.save();
-    throw new AppError(err.message, 500);
-  }
+  await transaction.save();
 
   const amount = account.getCurrencyAmount(
     req.body.currency,
@@ -108,6 +127,7 @@ const transferFund = async (req, res) => {
 };
 
 module.exports = {
+  getAllTransactions,
   fundAccount,
   transferFund,
 };

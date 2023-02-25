@@ -131,11 +131,6 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// userSchema.pre(/^find/, function (next) {
-//   this.find({}).select("-password");
-//   next();
-// });
-
 const User = mongoose.model("User", userSchema);
 
 function validateSignup(data) {
